@@ -6,14 +6,13 @@
     <title>TallySaaS</title>
     <link rel="stylesheet" href="css/style.css">
     <style>
-        /* Extra Styles for Navigation */
-        body { padding-bottom: 80px; } /* Space for bottom nav */
+        body { padding-bottom: 80px; } 
         
         .screen { display: none; }
         .screen.active { display: block; animation: fadeIn 0.3s; }
-        
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
+        /* Navigation */
         .bottom-nav {
             position: fixed; bottom: 0; left: 0; right: 0;
             background: white; border-top: 1px solid #eee;
@@ -29,12 +28,30 @@
         .nav-item i { display: block; font-size: 20px; margin-bottom: 4px; }
         .nav-item.active { color: var(--primary-color); font-weight: 600; }
 
-        /* Search Bar for Parties */
+        /* Search */
         .search-box {
             width: 100%; padding: 12px;
             border: 1px solid #ddd; border-radius: 8px;
             margin-bottom: 16px; font-size: 14px;
             background: #f9fafb;
+        }
+
+        /* Party List Styling */
+        .party-row {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 16px; background: white; border-bottom: 1px solid #eee;
+        }
+        .party-name { font-weight: 600; font-size: 14px; color: #111; margin-bottom: 4px; }
+        .party-loc { font-size: 11px; color: #888; }
+        
+        .amt-green { color: #059669; font-weight: 700; font-size: 14px; text-align: right; }
+        .amt-red { color: #dc2626; font-weight: 700; font-size: 14px; text-align: right; }
+        
+        .call-btn {
+            background: #eff6ff; color: var(--primary-color);
+            border: none; width: 36px; height: 36px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            margin-left: 12px; text-decoration: none;
         }
     </style>
 </head>
@@ -87,13 +104,10 @@
 
         <div id="screen-parties" class="screen">
             <div class="section-title">Party Directory</div>
-            <input type="text" class="search-box" placeholder="Search Party Name..." onkeyup="filterParties(this.value)">
+            <input type="text" id="searchInput" class="search-box" placeholder="Search Party Name..." onkeyup="handleSearch(this.value)">
             
-            <div id="partyListContainer">
-                <div class="list-item">
-                    <div class="party-info"><h4>Sharma Traders</h4><div class="party-meta">New Delhi</div></div>
-                    <div class="party-amount">₹ 25,000</div>
-                </div>
+            <div id="partyListContainer" style="background:white; border-radius:8px; overflow:hidden; border:1px solid #eee;">
+                <div class="loading-state">Loading Parties...</div>
             </div>
         </div>
 
@@ -115,7 +129,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-        // --- YOUR KEYS ARE NOW EMBEDDED HERE ---
+        // CONFIG
         const firebaseConfig = {
             apiKey: "AIzaSyDNF1TOY5J6fX4ocboy4zEVAlk0hpc17iQ",
             authDomain: "tallysaas-pro.firebaseapp.com",
@@ -125,7 +139,6 @@
             messagingSenderId: "1050564806602",
             appId: "1:1050564806602:web:3019ab4404a00e18b33133"
         };
-        // ----------------------------------
 
         const CLIENT_ID = localStorage.getItem("tally_client_id");
         if (!CLIENT_ID) window.location.href = "index.html";
@@ -134,22 +147,22 @@
         const db = getDatabase(app);
         const dataRef = ref(db, 'clients/' + CLIENT_ID);
 
+        let GLOBAL_PARTIES = []; // Store parties here for searching
+
         onValue(dataRef, (snapshot) => {
             const data = snapshot.val();
             if (data) {
                 const fmt = (n) => "₹ " + (n || 0).toLocaleString('en-IN');
 
-                // Header
+                // 1. Dashboard
                 document.getElementById('companyName').innerText = CLIENT_ID.replace(/_/g, " ").toUpperCase();
                 document.getElementById('lastUpdated').innerText = data.meta.last_sync;
-
-                // Dashboard Values
                 document.getElementById('valSales').innerText = fmt(data.dashboard.sales);
                 document.getElementById('valReceipt').innerText = fmt(data.dashboard.receipt);
                 document.getElementById('valBank').innerText = fmt(data.dashboard.bank);
                 document.getElementById('valCash').innerText = fmt(data.dashboard.cash);
 
-                // Outstanding List (Dashboard)
+                // 2. Outstanding List
                 const outList = document.getElementById('outstandingList');
                 outList.innerHTML = "";
                 if (data.outstanding) {
@@ -157,20 +170,65 @@
                         outList.innerHTML += `
                         <div class="list-item">
                             <div class="party-info"><h4>${bill.party}</h4><div class="party-meta">Overdue ${bill.days} days</div></div>
-                            <div class="party-amount">${fmt(bill.amount)}</div>
+                            <div class="party-amount" style="color:#dc2626">${fmt(bill.amount)}</div>
                         </div>`;
                     });
+                }
+
+                // 3. Parties List (Save to Global & Render)
+                if (data.parties) {
+                    GLOBAL_PARTIES = data.parties;
+                    window.renderParties(GLOBAL_PARTIES);
                 }
             }
         });
 
-        // Global Window Functions for Buttons
+        // --- GLOBAL FUNCTIONS ---
+        
+        window.renderParties = function(list) {
+            const container = document.getElementById('partyListContainer');
+            container.innerHTML = "";
+            const fmt = (n) => "₹ " + (n || 0).toLocaleString('en-IN');
+
+            if(list.length === 0) {
+                container.innerHTML = `<div class="loading-state">No parties found.</div>`;
+                return;
+            }
+
+            list.forEach(p => {
+                // Logic: Positive Balance = Green (Receivable), Negative = Red (Payable)
+                // Note: In Tally, Dr is (+) and Cr is (-).
+                // Let's assume standard accounting: Dr (Asset/Receivable) is Green.
+                const isPositive = p.balance >= 0; 
+                const colorClass = isPositive ? "amt-green" : "amt-red";
+                const label = isPositive ? "Dr" : "Cr";
+                
+                // Absolute value for display
+                const displayAmt = fmt(Math.abs(p.balance)) + " " + label;
+
+                container.innerHTML += `
+                <div class="party-row">
+                    <div style="flex:1">
+                        <div class="party-name">${p.name}</div>
+                        <div class="party-loc"><i class="fa-solid fa-location-dot"></i> ${p.city}</div>
+                    </div>
+                    <div style="display:flex; align-items:center;">
+                        <div class="${colorClass}">${displayAmt}</div>
+                        <a href="tel:${p.mobile}" class="call-btn"><i class="fa-solid fa-phone"></i></a>
+                    </div>
+                </div>`;
+            });
+        }
+
+        window.handleSearch = function(query) {
+            const q = query.toLowerCase();
+            const filtered = GLOBAL_PARTIES.filter(p => p.name.toLowerCase().includes(q) || p.city.toLowerCase().includes(q));
+            window.renderParties(filtered);
+        }
+
         window.switchTab = function(screenName, btn) {
-            // Hide all screens
             document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-            
-            // Show selected
             document.getElementById('screen-' + screenName).classList.add('active');
             btn.classList.add('active');
         }
