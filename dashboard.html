@@ -1,163 +1,184 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
-    />
-    <title>Dashboard</title>
-    <link rel="stylesheet" href="css/style.css" />
-  </head>
-  <body>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TallySaaS</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        /* Extra Styles for Navigation */
+        body { padding-bottom: 80px; } /* Space for bottom nav */
+        
+        .screen { display: none; }
+        .screen.active { display: block; animation: fadeIn 0.3s; }
+        
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        .bottom-nav {
+            position: fixed; bottom: 0; left: 0; right: 0;
+            background: white; border-top: 1px solid #eee;
+            display: flex; justify-content: space-around;
+            padding: 12px 0; padding-bottom: max(12px, env(safe-area-inset-bottom));
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+            z-index: 100;
+        }
+        .nav-item {
+            text-align: center; color: #9ca3af; font-size: 10px;
+            background: none; border: none; cursor: pointer;
+        }
+        .nav-item i { display: block; font-size: 20px; margin-bottom: 4px; }
+        .nav-item.active { color: var(--primary-color); font-weight: 600; }
+
+        /* Search Bar for Parties */
+        .search-box {
+            width: 100%; padding: 12px;
+            border: 1px solid #ddd; border-radius: 8px;
+            margin-bottom: 16px; font-size: 14px;
+            background: #f9fafb;
+        }
+    </style>
+</head>
+<body>
+
     <header class="app-header">
-      <div class="header-top">
-        <div class="company-title" id="companyName">Loading...</div>
-        <button onclick="logout()" class="logout-icon">
-          <i class="fa-solid fa-power-off"></i>
-        </button>
-      </div>
-      <div class="sync-status">
-        <div class="dot" id="statusDot"></div>
-        <span id="lastUpdated">Syncing...</span>
-      </div>
+        <div class="header-top">
+            <div class="company-title" id="companyName">Loading...</div>
+            <div class="sync-status">
+                <div class="dot" id="statusDot"></div>
+                <span id="lastUpdated">Syncing...</span>
+            </div>
+        </div>
     </header>
 
     <div class="main-container">
-      <div class="grid-cards">
-        <div class="stat-card sales">
-          <i class="fa-solid fa-arrow-trend-up stat-icon"></i>
-          <span class="stat-label">Total Sales</span>
-          <span class="stat-value" id="valSales">₹ 0</span>
-        </div>
-        <div class="stat-card receipt">
-          <i class="fa-solid fa-file-invoice stat-icon"></i>
-          <span class="stat-label">Total Receipt</span>
-          <span class="stat-value" id="valReceipt">₹ 0</span>
-        </div>
-        <div class="stat-card bank">
-          <i class="fa-solid fa-building-columns stat-icon"></i>
-          <span class="stat-label">Bank Balance</span>
-          <span class="stat-value" id="valBank">₹ 0</span>
-        </div>
-        <div class="stat-card cash">
-          <i class="fa-solid fa-wallet stat-icon"></i>
-          <span class="stat-label">Cash in Hand</span>
-          <span class="stat-value" id="valCash">₹ 0</span>
-        </div>
-      </div>
 
-      <div class="section-title">
-        <i
-          class="fa-solid fa-clock-rotate-left"
-          style="color: var(--danger)"
-        ></i>
-        Overdue Payments
-      </div>
+        <div id="screen-dashboard" class="screen active">
+            <div class="grid-cards">
+                <div class="stat-card sales">
+                    <i class="fa-solid fa-arrow-trend-up stat-icon"></i>
+                    <span class="stat-label">Total Sales</span>
+                    <span class="stat-value" id="valSales">₹ 0</span>
+                </div>
+                <div class="stat-card receipt">
+                    <i class="fa-solid fa-file-invoice stat-icon"></i>
+                    <span class="stat-label">Total Receipt</span>
+                    <span class="stat-value" id="valReceipt">₹ 0</span>
+                </div>
+                <div class="stat-card bank">
+                    <i class="fa-solid fa-building-columns stat-icon"></i>
+                    <span class="stat-label">Bank Balance</span>
+                    <span class="stat-value" id="valBank">₹ 0</span>
+                </div>
+                <div class="stat-card cash">
+                    <i class="fa-solid fa-wallet stat-icon"></i>
+                    <span class="stat-label">Cash in Hand</span>
+                    <span class="stat-value" id="valCash">₹ 0</span>
+                </div>
+            </div>
 
-      <div id="outstandingList">
-        <div class="loading-state">
-          <i class="fa-solid fa-circle-notch fa-spin"></i><br /><br />
-          Connecting to Tally...
+            <div class="section-title">
+                <i class="fa-solid fa-clock-rotate-left" style="color:var(--danger)"></i>
+                Overdue Payments
+            </div>
+            <div id="outstandingList">
+                <div class="loading-state">Loading Data...</div>
+            </div>
         </div>
-      </div>
+
+        <div id="screen-parties" class="screen">
+            <div class="section-title">Party Directory</div>
+            <input type="text" class="search-box" placeholder="Search Party Name..." onkeyup="filterParties(this.value)">
+            
+            <div id="partyListContainer">
+                <div class="list-item">
+                    <div class="party-info"><h4>Sharma Traders</h4><div class="party-meta">New Delhi</div></div>
+                    <div class="party-amount">₹ 25,000</div>
+                </div>
+            </div>
+        </div>
+
     </div>
 
+    <nav class="bottom-nav">
+        <button class="nav-item active" onclick="switchTab('dashboard', this)">
+            <i class="fa-solid fa-chart-pie"></i> Dashboard
+        </button>
+        <button class="nav-item" onclick="switchTab('parties', this)">
+            <i class="fa-solid fa-users"></i> Parties
+        </button>
+        <button class="nav-item" onclick="logout()">
+            <i class="fa-solid fa-power-off"></i> Logout
+        </button>
+    </nav>
+
     <script type="module">
-      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-      import {
-        getDatabase,
-        ref,
-        onValue,
-      } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-      // --- PASTE YOUR CONFIG BELOW THIS LINE ---
-      const firebaseConfig = {
-        apiKey: "AIzaSyDNF1TOY5J6fX4ocboy4zEVAlk0hpc17iQ",
-        authDomain: "tallysaas-pro.firebaseapp.com",
-        databaseURL:
-          "https://tallysaas-pro-default-rtdb.asia-southeast1.firebasedatabase.app",
-        projectId: "tallysaas-pro",
-        storageBucket: "tallysaas-pro.firebasestorage.app",
-        messagingSenderId: "1050564806602",
-        appId: "1:1050564806602:web:3019ab4404a00e18b33133",
-      };
-      // -----------------------------------------
+        // --- YOUR KEYS ARE NOW EMBEDDED HERE ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyDNF1TOY5J6fX4ocboy4zEVAlk0hpc17iQ",
+            authDomain: "tallysaas-pro.firebaseapp.com",
+            databaseURL: "https://tallysaas-pro-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "tallysaas-pro",
+            storageBucket: "tallysaas-pro.firebasestorage.app",
+            messagingSenderId: "1050564806602",
+            appId: "1:1050564806602:web:3019ab4404a00e18b33133"
+        };
+        // ----------------------------------
 
-      // 1. Get Client ID
-      const CLIENT_ID = localStorage.getItem("tally_client_id");
-      if (!CLIENT_ID) window.location.href = "index.html";
+        const CLIENT_ID = localStorage.getItem("tally_client_id");
+        if (!CLIENT_ID) window.location.href = "index.html";
 
-      // 2. Initialize App
-      const app = initializeApp(firebaseConfig);
-      const db = getDatabase(app);
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const dataRef = ref(db, 'clients/' + CLIENT_ID);
 
-      // 3. Listen for Data
-      const dataRef = ref(db, "clients/" + CLIENT_ID);
+        onValue(dataRef, (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                const fmt = (n) => "₹ " + (n || 0).toLocaleString('en-IN');
 
-      onValue(dataRef, (snapshot) => {
-        const data = snapshot.val();
+                // Header
+                document.getElementById('companyName').innerText = CLIENT_ID.replace(/_/g, " ").toUpperCase();
+                document.getElementById('lastUpdated').innerText = data.meta.last_sync;
 
-        if (data) {
-          // Update Company Name Title
-          document.getElementById("companyName").innerText = CLIENT_ID.replace(
-            /_/g,
-            " "
-          ).toUpperCase();
+                // Dashboard Values
+                document.getElementById('valSales').innerText = fmt(data.dashboard.sales);
+                document.getElementById('valReceipt').innerText = fmt(data.dashboard.receipt);
+                document.getElementById('valBank').innerText = fmt(data.dashboard.bank);
+                document.getElementById('valCash').innerText = fmt(data.dashboard.cash);
 
-          // Update Time
-          document.getElementById("lastUpdated").innerText =
-            "Last Sync: " + data.meta.last_sync;
-
-          // Helper: Format Money (₹ 1,20,000)
-          const fmt = (n) => "₹ " + (n || 0).toLocaleString("en-IN");
-
-          // Update Cards
-          document.getElementById("valSales").innerText = fmt(
-            data.dashboard.sales
-          );
-          document.getElementById("valReceipt").innerText = fmt(
-            data.dashboard.receipt
-          );
-          document.getElementById("valBank").innerText = fmt(
-            data.dashboard.bank
-          );
-          document.getElementById("valCash").innerText = fmt(
-            data.dashboard.cash
-          );
-
-          // Update List
-          const listContainer = document.getElementById("outstandingList");
-          listContainer.innerHTML = ""; // Clear loader
-
-          if (data.outstanding && data.outstanding.length > 0) {
-            data.outstanding.forEach((bill) => {
-              listContainer.innerHTML += `
+                // Outstanding List (Dashboard)
+                const outList = document.getElementById('outstandingList');
+                outList.innerHTML = "";
+                if (data.outstanding) {
+                    data.outstanding.forEach(bill => {
+                        outList.innerHTML += `
                         <div class="list-item">
-                            <div class="party-info">
-                                <h4>${bill.party}</h4>
-                                <div class="party-meta">Overdue by ${
-                                  bill.days
-                                } days</div>
-                            </div>
+                            <div class="party-info"><h4>${bill.party}</h4><div class="party-meta">Overdue ${bill.days} days</div></div>
                             <div class="party-amount">${fmt(bill.amount)}</div>
                         </div>`;
-            });
-          } else {
-            listContainer.innerHTML = `<div class="loading-state">No pending bills. Good job!</div>`;
-          }
-        } else {
-          document.getElementById(
-            "outstandingList"
-          ).innerHTML = `<div class="loading-state" style="color:red">No data found for ID: <b>${CLIENT_ID}</b>.<br>Check your Company ID.</div>`;
-        }
-      });
+                    });
+                }
+            }
+        });
 
-      // Logout Function
-      window.logout = function () {
-        localStorage.removeItem("tally_client_id");
-        window.location.href = "index.html";
-      };
+        // Global Window Functions for Buttons
+        window.switchTab = function(screenName, btn) {
+            // Hide all screens
+            document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            
+            // Show selected
+            document.getElementById('screen-' + screenName).classList.add('active');
+            btn.classList.add('active');
+        }
+
+        window.logout = function() {
+            localStorage.removeItem("tally_client_id");
+            window.location.href = "index.html";
+        }
     </script>
-  </body>
+</body>
 </html>
