@@ -27,31 +27,34 @@
         .nav-item i { display: block; font-size: 20px; margin-bottom: 4px; }
         .nav-item.active { color: var(--primary-color); font-weight: 600; }
 
-        /* Search & Lists */
         .search-box {
             width: 100%; padding: 12px;
             border: 1px solid #ddd; border-radius: 8px;
-            margin-bottom: 16px; font-size: 14px;
-            background: #f9fafb;
+            margin-bottom: 16px; font-size: 14px; background: #f9fafb;
         }
-
         .list-container { background:white; border-radius:8px; overflow:hidden; border:1px solid #eee; }
 
-        .party-row, .stock-row {
+        /* Common Row Styles */
+        .party-row, .stock-row, .day-row {
             display: flex; justify-content: space-between; align-items: center;
             padding: 16px; background: white; border-bottom: 1px solid #eee;
         }
-        
-        /* Stock Specific Styles */
+
+        /* Specific Styles */
         .item-name { font-weight: 600; font-size: 14px; color: #111; margin-bottom: 4px; }
         .item-meta { font-size: 11px; color: #6b7280; }
-        .stock-qty { font-weight: 700; font-size: 15px; color: var(--primary-color); text-align: right; }
-        .stock-val { font-size: 11px; color: #888; text-align: right; margin-top: 2px;}
-        .low-stock { color: #dc2626 !important; } /* Red if qty is 0 */
         
-        /* Party Styles */
+        .stock-qty { font-weight: 700; font-size: 15px; color: var(--primary-color); text-align: right; }
+        .low-stock { color: #dc2626 !important; }
+
         .amt-green { color: #059669; font-weight: 700; font-size: 14px; text-align: right; }
         .amt-red { color: #dc2626; font-weight: 700; font-size: 14px; text-align: right; }
+        
+        .badge { font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 600; text-transform: uppercase;}
+        .badge-sales { background: #dcfce7; color: #166534; }
+        .badge-receipt { background: #dbeafe; color: #1e40af; }
+        .badge-payment { background: #fee2e2; color: #991b1b; }
+        
         .call-btn {
             background: #eff6ff; color: var(--primary-color);
             border: none; width: 36px; height: 36px; border-radius: 50%;
@@ -97,14 +100,6 @@
                     <span class="stat-value" id="valCash">₹ 0</span>
                 </div>
             </div>
-
-            <div class="section-title">
-                <i class="fa-solid fa-clock-rotate-left" style="color:var(--danger)"></i>
-                Overdue Payments
-            </div>
-            <div id="outstandingList">
-                <div class="loading-state">Loading Data...</div>
-            </div>
         </div>
 
         <div id="screen-parties" class="screen">
@@ -123,11 +118,18 @@
             </div>
         </div>
 
+        <div id="screen-daybook" class="screen">
+            <div class="section-title">Today's Activity</div>
+            <div id="daybookContainer" class="list-container">
+                <div class="loading-state">Loading Transactions...</div>
+            </div>
+        </div>
+
     </div>
 
     <nav class="bottom-nav">
         <button class="nav-item active" onclick="switchTab('dashboard', this)">
-            <i class="fa-solid fa-chart-pie"></i> Dashboard
+            <i class="fa-solid fa-chart-pie"></i> Dash
         </button>
         <button class="nav-item" onclick="switchTab('parties', this)">
             <i class="fa-solid fa-users"></i> Parties
@@ -135,8 +137,8 @@
         <button class="nav-item" onclick="switchTab('stock', this)">
             <i class="fa-solid fa-boxes-stacked"></i> Stock
         </button>
-        <button class="nav-item" onclick="logout()">
-            <i class="fa-solid fa-power-off"></i> Logout
+        <button class="nav-item" onclick="switchTab('daybook', this)">
+            <i class="fa-solid fa-calendar-day"></i> Day Book
         </button>
     </nav>
 
@@ -170,7 +172,7 @@
             if (data) {
                 const fmt = (n) => "₹ " + (n || 0).toLocaleString('en-IN');
 
-                // 1. Dashboard Logic
+                // 1. Dashboard
                 document.getElementById('companyName').innerText = CLIENT_ID.replace(/_/g, " ").toUpperCase();
                 document.getElementById('lastUpdated').innerText = data.meta.last_sync;
                 document.getElementById('valSales').innerText = fmt(data.dashboard.sales);
@@ -178,28 +180,10 @@
                 document.getElementById('valBank').innerText = fmt(data.dashboard.bank);
                 document.getElementById('valCash').innerText = fmt(data.dashboard.cash);
 
-                // Outstanding
-                const outList = document.getElementById('outstandingList');
-                outList.innerHTML = "";
-                if (data.outstanding) {
-                    data.outstanding.forEach(bill => {
-                        outList.innerHTML += `
-                        <div class="list-item">
-                            <div class="party-info"><h4>${bill.party}</h4><div class="party-meta">Overdue ${bill.days} days</div></div>
-                            <div class="party-amount" style="color:#dc2626">${fmt(bill.amount)}</div>
-                        </div>`;
-                    });
-                }
-
-                // 2. Save Data Globally
-                if (data.parties) {
-                    GLOBAL_PARTIES = data.parties;
-                    renderParties(GLOBAL_PARTIES);
-                }
-                if (data.inventory) {
-                    GLOBAL_STOCK = data.inventory;
-                    renderStock(GLOBAL_STOCK);
-                }
+                // 2. Render Lists
+                if (data.parties) { GLOBAL_PARTIES = data.parties; renderParties(GLOBAL_PARTIES); }
+                if (data.inventory) { GLOBAL_STOCK = data.inventory; renderStock(GLOBAL_STOCK); }
+                if (data.daybook) { renderDaybook(data.daybook); }
             }
         });
 
@@ -211,15 +195,14 @@
             
             list.forEach(p => {
                 const isPos = p.balance >= 0; 
-                const color = isPos ? "amt-green" : "amt-red";
                 container.innerHTML += `
                 <div class="party-row">
                     <div style="flex:1">
                         <div class="item-name">${p.name}</div>
-                        <div class="item-meta"><i class="fa-solid fa-location-dot"></i> ${p.city}</div>
+                        <div class="item-meta">${p.city}</div>
                     </div>
                     <div style="display:flex; align-items:center;">
-                        <div class="${color}">${fmt(Math.abs(p.balance))} ${isPos?'Dr':'Cr'}</div>
+                        <div class="${isPos ? 'amt-green' : 'amt-red'}">${fmt(Math.abs(p.balance))} ${isPos?'Dr':'Cr'}</div>
                         <a href="tel:${p.mobile}" class="call-btn"><i class="fa-solid fa-phone"></i></a>
                     </div>
                 </div>`;
@@ -229,11 +212,7 @@
         window.renderStock = function(list) {
             const container = document.getElementById('stockListContainer');
             container.innerHTML = "";
-            
             list.forEach(item => {
-                // If Qty is 0, show Red
-                const qtyClass = item.qty > 0 ? "stock-qty" : "stock-qty low-stock";
-                
                 container.innerHTML += `
                 <div class="stock-row">
                     <div style="flex:1">
@@ -241,21 +220,45 @@
                         <div class="item-meta">Rate: ₹${item.rate} / ${item.unit}</div>
                     </div>
                     <div>
-                        <div class="${qtyClass}">${item.qty} ${item.unit}</div>
-                        <div class="stock-val">Val: ₹${(item.qty * item.rate).toLocaleString('en-IN')}</div>
+                        <div class="${item.qty>0?'stock-qty':'stock-qty low-stock'}">${item.qty} ${item.unit}</div>
                     </div>
                 </div>`;
             });
         }
 
-        // --- SEARCH FUNCTIONS ---
+        window.renderDaybook = function(list) {
+            const container = document.getElementById('daybookContainer');
+            container.innerHTML = "";
+            const fmt = (n) => "₹ " + (n || 0).toLocaleString('en-IN');
+
+            list.forEach(tx => {
+                // Color Logic: Money In (Green), Money Out (Red)
+                const colorClass = tx.is_in ? "amt-green" : "amt-red";
+                // Badge Logic
+                let badgeClass = "badge-sales";
+                if(tx.v_type === "Receipt") badgeClass = "badge-receipt";
+                if(tx.v_type === "Payment") badgeClass = "badge-payment";
+
+                container.innerHTML += `
+                <div class="day-row">
+                    <div style="flex:1">
+                        <div class="item-name">${tx.party}</div>
+                        <div style="display:flex; gap:6px; margin-top:2px;">
+                            <span class="badge ${badgeClass}">${tx.v_type}</span>
+                            <span class="item-meta">${tx.v_no}</span>
+                        </div>
+                    </div>
+                    <div class="${colorClass}">${fmt(tx.amount)}</div>
+                </div>`;
+            });
+        }
+
+        // --- SEARCH ---
         window.handlePartySearch = function(q) {
-            const filtered = GLOBAL_PARTIES.filter(p => p.name.toLowerCase().includes(q.toLowerCase()));
-            renderParties(filtered);
+            window.renderParties(GLOBAL_PARTIES.filter(p => p.name.toLowerCase().includes(q.toLowerCase())));
         }
         window.handleStockSearch = function(q) {
-            const filtered = GLOBAL_STOCK.filter(i => i.name.toLowerCase().includes(q.toLowerCase()));
-            renderStock(filtered);
+            window.renderStock(GLOBAL_STOCK.filter(i => i.name.toLowerCase().includes(q.toLowerCase())));
         }
 
         // --- NAVIGATION ---
