@@ -7,7 +7,6 @@
     <link rel="stylesheet" href="css/style.css">
     <style>
         body { padding-bottom: 80px; } 
-        
         .screen { display: none; }
         .screen.active { display: block; animation: fadeIn 0.3s; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
@@ -28,7 +27,7 @@
         .nav-item i { display: block; font-size: 20px; margin-bottom: 4px; }
         .nav-item.active { color: var(--primary-color); font-weight: 600; }
 
-        /* Search */
+        /* Search & Lists */
         .search-box {
             width: 100%; padding: 12px;
             border: 1px solid #ddd; border-radius: 8px;
@@ -36,17 +35,23 @@
             background: #f9fafb;
         }
 
-        /* Party List Styling */
-        .party-row {
+        .list-container { background:white; border-radius:8px; overflow:hidden; border:1px solid #eee; }
+
+        .party-row, .stock-row {
             display: flex; justify-content: space-between; align-items: center;
             padding: 16px; background: white; border-bottom: 1px solid #eee;
         }
-        .party-name { font-weight: 600; font-size: 14px; color: #111; margin-bottom: 4px; }
-        .party-loc { font-size: 11px; color: #888; }
         
+        /* Stock Specific Styles */
+        .item-name { font-weight: 600; font-size: 14px; color: #111; margin-bottom: 4px; }
+        .item-meta { font-size: 11px; color: #6b7280; }
+        .stock-qty { font-weight: 700; font-size: 15px; color: var(--primary-color); text-align: right; }
+        .stock-val { font-size: 11px; color: #888; text-align: right; margin-top: 2px;}
+        .low-stock { color: #dc2626 !important; } /* Red if qty is 0 */
+        
+        /* Party Styles */
         .amt-green { color: #059669; font-weight: 700; font-size: 14px; text-align: right; }
         .amt-red { color: #dc2626; font-weight: 700; font-size: 14px; text-align: right; }
-        
         .call-btn {
             background: #eff6ff; color: var(--primary-color);
             border: none; width: 36px; height: 36px; border-radius: 50%;
@@ -104,10 +109,17 @@
 
         <div id="screen-parties" class="screen">
             <div class="section-title">Party Directory</div>
-            <input type="text" id="searchInput" class="search-box" placeholder="Search Party Name..." onkeyup="handleSearch(this.value)">
-            
-            <div id="partyListContainer" style="background:white; border-radius:8px; overflow:hidden; border:1px solid #eee;">
+            <input type="text" class="search-box" placeholder="Search Party..." onkeyup="handlePartySearch(this.value)">
+            <div id="partyListContainer" class="list-container">
                 <div class="loading-state">Loading Parties...</div>
+            </div>
+        </div>
+
+        <div id="screen-stock" class="screen">
+            <div class="section-title">Inventory Summary</div>
+            <input type="text" class="search-box" placeholder="Search Item..." onkeyup="handleStockSearch(this.value)">
+            <div id="stockListContainer" class="list-container">
+                <div class="loading-state">Loading Stock...</div>
             </div>
         </div>
 
@@ -120,6 +132,9 @@
         <button class="nav-item" onclick="switchTab('parties', this)">
             <i class="fa-solid fa-users"></i> Parties
         </button>
+        <button class="nav-item" onclick="switchTab('stock', this)">
+            <i class="fa-solid fa-boxes-stacked"></i> Stock
+        </button>
         <button class="nav-item" onclick="logout()">
             <i class="fa-solid fa-power-off"></i> Logout
         </button>
@@ -129,7 +144,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-        // CONFIG
+        // EMBEDDED KEYS
         const firebaseConfig = {
             apiKey: "AIzaSyDNF1TOY5J6fX4ocboy4zEVAlk0hpc17iQ",
             authDomain: "tallysaas-pro.firebaseapp.com",
@@ -147,14 +162,15 @@
         const db = getDatabase(app);
         const dataRef = ref(db, 'clients/' + CLIENT_ID);
 
-        let GLOBAL_PARTIES = []; // Store parties here for searching
+        let GLOBAL_PARTIES = []; 
+        let GLOBAL_STOCK = [];
 
         onValue(dataRef, (snapshot) => {
             const data = snapshot.val();
             if (data) {
                 const fmt = (n) => "₹ " + (n || 0).toLocaleString('en-IN');
 
-                // 1. Dashboard
+                // 1. Dashboard Logic
                 document.getElementById('companyName').innerText = CLIENT_ID.replace(/_/g, " ").toUpperCase();
                 document.getElementById('lastUpdated').innerText = data.meta.last_sync;
                 document.getElementById('valSales').innerText = fmt(data.dashboard.sales);
@@ -162,7 +178,7 @@
                 document.getElementById('valBank').innerText = fmt(data.dashboard.bank);
                 document.getElementById('valCash').innerText = fmt(data.dashboard.cash);
 
-                // 2. Outstanding List
+                // Outstanding
                 const outList = document.getElementById('outstandingList');
                 outList.innerHTML = "";
                 if (data.outstanding) {
@@ -175,57 +191,74 @@
                     });
                 }
 
-                // 3. Parties List (Save to Global & Render)
+                // 2. Save Data Globally
                 if (data.parties) {
                     GLOBAL_PARTIES = data.parties;
-                    window.renderParties(GLOBAL_PARTIES);
+                    renderParties(GLOBAL_PARTIES);
+                }
+                if (data.inventory) {
+                    GLOBAL_STOCK = data.inventory;
+                    renderStock(GLOBAL_STOCK);
                 }
             }
         });
 
-        // --- GLOBAL FUNCTIONS ---
-        
+        // --- RENDER FUNCTIONS ---
         window.renderParties = function(list) {
             const container = document.getElementById('partyListContainer');
             container.innerHTML = "";
             const fmt = (n) => "₹ " + (n || 0).toLocaleString('en-IN');
-
-            if(list.length === 0) {
-                container.innerHTML = `<div class="loading-state">No parties found.</div>`;
-                return;
-            }
-
+            
             list.forEach(p => {
-                // Logic: Positive Balance = Green (Receivable), Negative = Red (Payable)
-                // Note: In Tally, Dr is (+) and Cr is (-).
-                // Let's assume standard accounting: Dr (Asset/Receivable) is Green.
-                const isPositive = p.balance >= 0; 
-                const colorClass = isPositive ? "amt-green" : "amt-red";
-                const label = isPositive ? "Dr" : "Cr";
-                
-                // Absolute value for display
-                const displayAmt = fmt(Math.abs(p.balance)) + " " + label;
-
+                const isPos = p.balance >= 0; 
+                const color = isPos ? "amt-green" : "amt-red";
                 container.innerHTML += `
                 <div class="party-row">
                     <div style="flex:1">
-                        <div class="party-name">${p.name}</div>
-                        <div class="party-loc"><i class="fa-solid fa-location-dot"></i> ${p.city}</div>
+                        <div class="item-name">${p.name}</div>
+                        <div class="item-meta"><i class="fa-solid fa-location-dot"></i> ${p.city}</div>
                     </div>
                     <div style="display:flex; align-items:center;">
-                        <div class="${colorClass}">${displayAmt}</div>
+                        <div class="${color}">${fmt(Math.abs(p.balance))} ${isPos?'Dr':'Cr'}</div>
                         <a href="tel:${p.mobile}" class="call-btn"><i class="fa-solid fa-phone"></i></a>
                     </div>
                 </div>`;
             });
         }
 
-        window.handleSearch = function(query) {
-            const q = query.toLowerCase();
-            const filtered = GLOBAL_PARTIES.filter(p => p.name.toLowerCase().includes(q) || p.city.toLowerCase().includes(q));
-            window.renderParties(filtered);
+        window.renderStock = function(list) {
+            const container = document.getElementById('stockListContainer');
+            container.innerHTML = "";
+            
+            list.forEach(item => {
+                // If Qty is 0, show Red
+                const qtyClass = item.qty > 0 ? "stock-qty" : "stock-qty low-stock";
+                
+                container.innerHTML += `
+                <div class="stock-row">
+                    <div style="flex:1">
+                        <div class="item-name">${item.name}</div>
+                        <div class="item-meta">Rate: ₹${item.rate} / ${item.unit}</div>
+                    </div>
+                    <div>
+                        <div class="${qtyClass}">${item.qty} ${item.unit}</div>
+                        <div class="stock-val">Val: ₹${(item.qty * item.rate).toLocaleString('en-IN')}</div>
+                    </div>
+                </div>`;
+            });
         }
 
+        // --- SEARCH FUNCTIONS ---
+        window.handlePartySearch = function(q) {
+            const filtered = GLOBAL_PARTIES.filter(p => p.name.toLowerCase().includes(q.toLowerCase()));
+            renderParties(filtered);
+        }
+        window.handleStockSearch = function(q) {
+            const filtered = GLOBAL_STOCK.filter(i => i.name.toLowerCase().includes(q.toLowerCase()));
+            renderStock(filtered);
+        }
+
+        // --- NAVIGATION ---
         window.switchTab = function(screenName, btn) {
             document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
