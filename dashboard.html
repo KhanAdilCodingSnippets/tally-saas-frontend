@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>Dashboard</title>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="header-top">
+        <div class="company-title" id="companyName">Loading...</div>
+        <button onclick="logout()" class="logout-icon">
+          <i class="fa-solid fa-power-off"></i>
+        </button>
+      </div>
+      <div class="sync-status">
+        <div class="dot" id="statusDot"></div>
+        <span id="lastUpdated">Syncing...</span>
+      </div>
+    </header>
+
+    <div class="main-container">
+      <div class="grid-cards">
+        <div class="stat-card sales">
+          <i class="fa-solid fa-arrow-trend-up stat-icon"></i>
+          <span class="stat-label">Total Sales</span>
+          <span class="stat-value" id="valSales">₹ 0</span>
+        </div>
+        <div class="stat-card receipt">
+          <i class="fa-solid fa-file-invoice stat-icon"></i>
+          <span class="stat-label">Total Receipt</span>
+          <span class="stat-value" id="valReceipt">₹ 0</span>
+        </div>
+        <div class="stat-card bank">
+          <i class="fa-solid fa-building-columns stat-icon"></i>
+          <span class="stat-label">Bank Balance</span>
+          <span class="stat-value" id="valBank">₹ 0</span>
+        </div>
+        <div class="stat-card cash">
+          <i class="fa-solid fa-wallet stat-icon"></i>
+          <span class="stat-label">Cash in Hand</span>
+          <span class="stat-value" id="valCash">₹ 0</span>
+        </div>
+      </div>
+
+      <div class="section-title">
+        <i
+          class="fa-solid fa-clock-rotate-left"
+          style="color: var(--danger)"
+        ></i>
+        Overdue Payments
+      </div>
+
+      <div id="outstandingList">
+        <div class="loading-state">
+          <i class="fa-solid fa-circle-notch fa-spin"></i><br /><br />
+          Connecting to Tally...
+        </div>
+      </div>
+    </div>
+
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+      import {
+        getDatabase,
+        ref,
+        onValue,
+      } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+      // --- PASTE YOUR CONFIG BELOW THIS LINE ---
+      const firebaseConfig = {
+        apiKey: "AIzaSyDNF1TOY5J6fX4ocboy4zEVAlk0hpc17iQ",
+        authDomain: "tallysaas-pro.firebaseapp.com",
+        databaseURL:
+          "https://tallysaas-pro-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "tallysaas-pro",
+        storageBucket: "tallysaas-pro.firebasestorage.app",
+        messagingSenderId: "1050564806602",
+        appId: "1:1050564806602:web:3019ab4404a00e18b33133",
+      };
+      // -----------------------------------------
+
+      // 1. Get Client ID
+      const CLIENT_ID = localStorage.getItem("tally_client_id");
+      if (!CLIENT_ID) window.location.href = "index.html";
+
+      // 2. Initialize App
+      const app = initializeApp(firebaseConfig);
+      const db = getDatabase(app);
+
+      // 3. Listen for Data
+      const dataRef = ref(db, "clients/" + CLIENT_ID);
+
+      onValue(dataRef, (snapshot) => {
+        const data = snapshot.val();
+
+        if (data) {
+          // Update Company Name Title
+          document.getElementById("companyName").innerText = CLIENT_ID.replace(
+            /_/g,
+            " "
+          ).toUpperCase();
+
+          // Update Time
+          document.getElementById("lastUpdated").innerText =
+            "Last Sync: " + data.meta.last_sync;
+
+          // Helper: Format Money (₹ 1,20,000)
+          const fmt = (n) => "₹ " + (n || 0).toLocaleString("en-IN");
+
+          // Update Cards
+          document.getElementById("valSales").innerText = fmt(
+            data.dashboard.sales
+          );
+          document.getElementById("valReceipt").innerText = fmt(
+            data.dashboard.receipt
+          );
+          document.getElementById("valBank").innerText = fmt(
+            data.dashboard.bank
+          );
+          document.getElementById("valCash").innerText = fmt(
+            data.dashboard.cash
+          );
+
+          // Update List
+          const listContainer = document.getElementById("outstandingList");
+          listContainer.innerHTML = ""; // Clear loader
+
+          if (data.outstanding && data.outstanding.length > 0) {
+            data.outstanding.forEach((bill) => {
+              listContainer.innerHTML += `
+                        <div class="list-item">
+                            <div class="party-info">
+                                <h4>${bill.party}</h4>
+                                <div class="party-meta">Overdue by ${
+                                  bill.days
+                                } days</div>
+                            </div>
+                            <div class="party-amount">${fmt(bill.amount)}</div>
+                        </div>`;
+            });
+          } else {
+            listContainer.innerHTML = `<div class="loading-state">No pending bills. Good job!</div>`;
+          }
+        } else {
+          document.getElementById(
+            "outstandingList"
+          ).innerHTML = `<div class="loading-state" style="color:red">No data found for ID: <b>${CLIENT_ID}</b>.<br>Check your Company ID.</div>`;
+        }
+      });
+
+      // Logout Function
+      window.logout = function () {
+        localStorage.removeItem("tally_client_id");
+        window.location.href = "index.html";
+      };
+    </script>
+  </body>
+</html>

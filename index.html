@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Login | TallySaaS</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/906/906343.png">
+</head>
+<body>
+
+    <div class="login-wrapper">
+        <div class="login-card">
+            <div class="brand-icon">
+                <i class="fa-solid fa-chart-simple"></i>
+            </div>
+            <h1 class="login-title">Welcome Back</h1>
+            <p class="login-subtitle">Enter your Company ID to access your Tally data securely.</p>
+
+            <div class="form-group">
+                <label class="form-label">COMPANY ID</label>
+                <input type="text" id="clientId" class="form-input" placeholder="e.g. client_demo_01" autocomplete="off">
+            </div>
+
+            <button onclick="login()" class="btn-primary">Connect Dashboard</button>
+        </div>
+        <p style="margin-top:20px; color:rgba(255,255,255,0.5); font-size:11px;">Powered by TallySaaS Pro</p>
+    </div>
+
+    <script>
+        // Check if user is already logged in
+        const savedId = localStorage.getItem("tally_client_id");
+        if (savedId) {
+            window.location.href = "dashboard.html";
+        }
+
+        function login() {
+            const inputId = document.getElementById("clientId").value.trim();
+            
+            if (inputId.length < 3) {
+                alert("Please enter a valid Company ID");
+                return;
+            }
+
+            // Save ID to phone memory
+            localStorage.setItem("tally_client_id", inputId);
+            
+            // Redirect to App
+            window.location.href = "dashboard.html";
+        }
+    </script>
+</body>
+</html>
